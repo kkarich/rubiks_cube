@@ -1,11 +1,8 @@
 #[macro_use]
 extern crate rocket;
 use rocket::State;
-
 use rocket::serde::{json::Json, Deserialize, Serialize};
-
 use std::sync::atomic::AtomicUsize;
-
 use std::sync::{Arc, Mutex};
 
 mod cors;
@@ -25,14 +22,8 @@ type AppStatePointer = Arc<Mutex<AppState>>;
 impl AppState {
     fn new() -> AppStatePointer {
         let app_state = AppState { cube: Cube::new() };
-
         Arc::new(Mutex::new(app_state))
     }
-}
-
-#[get("/")]
-fn index() -> &'static str {
-    "Hello"
 }
 
 #[derive(Serialize)]
@@ -43,12 +34,6 @@ struct CubeState {
     faces: Vec<Vec<Vec<StickerColor>>>,
 }
 
-// #[get("/get_moves", format = "json")]
-// fn get_cube(app_state_pointer: &State<AppStatePointer>) -> Json<CubeState> {
-//     let app_state = app_state_pointer.lock().unwrap();
-//     let cube = &app_state.cube;
-//     Json(CubeState { pieces: cube.pieces.clone(), faces: cube.unwrap() })
-// }
 
 #[get("/get_cube", format = "json")]
 fn get_cube(app_state_pointer: &State<AppStatePointer>) -> Json<CubeState> {
@@ -73,19 +58,12 @@ fn apply_move(app_state: &State<AppStatePointer>, cube_move: CubeMove) -> Json<C
         animation,
         faces: cube.unwrap(),
     })
-
-    // cube.apply_move(cube_move);
-    // Json(CubeState {
-    //     pieces: cube.pieces.clone(),
-    //     animation: vec![],
-    //     faces: cube.unwrap(),
-    // })
 }
 
 #[launch]
 fn rocket() -> _ {
     rocket::build()
         .attach(cors::Cors)
-        .mount("/", routes![index, get_cube, apply_move])
+        .mount("/", routes![get_cube, apply_move])
         .manage(AppState::new())
 }

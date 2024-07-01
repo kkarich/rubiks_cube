@@ -20,6 +20,7 @@ fn round_to_nearest_hundredth(vec: &Vector3<f32>) -> Vector3<f32> {
     vec.map(|x| (x * 100.0).round() / 100.0)
 }
 
+// 3D Direction enums for easier readability
 #[derive(PartialEq, Eq, Debug, EnumIter, Serialize, Clone)]
 enum Direction {
     Up,
@@ -31,6 +32,7 @@ enum Direction {
 }
 
 impl Direction {
+    // convert vector to direction
     fn vector(&self) -> Unit<Vector3<f32>> {
         match self {
             Direction::Up => Vector3::y_axis(),
@@ -42,6 +44,7 @@ impl Direction {
         }
     }
 
+    // convert vector to Direction
     fn from_vector(vector: Vector3<f32>) -> Option<Direction> {
         for direction in Direction::iter() {
             if direction.vector() == Unit::new_normalize(vector) {
@@ -77,6 +80,7 @@ pub enum CubeMove {
 }
 
 impl CubeMove {
+    // convert a move Object into a Direction and Rotation Angle
     fn to_direction_and_degree(&self) -> Option<(Direction, f32)> {
         match self {
             CubeMove::U => Some((Direction::Up, -90.0)),
@@ -102,6 +106,7 @@ impl CubeMove {
     }
 }
 
+// implement from_parm for API to convert strings from the url into CubeMoves example: "U" Becomes CubeMove::U
 impl<'r> FromParam<'r> for CubeMove {
     type Error = &'r str;
 
@@ -141,6 +146,7 @@ pub enum StickerColor {
     Blue,
 }
 
+// map to get initial color based on face direction
 fn direction_to_color(direction: &Direction) -> StickerColor {
     match direction {
         Direction::Up => StickerColor::White,
@@ -152,6 +158,9 @@ fn direction_to_color(direction: &Direction) -> StickerColor {
     }
 }
 
+// Rough implementation of UVMapping
+// Use this struct so that we can "unwrap" our 3D cube
+// This struct contains helper data and methods to convert our 3D representation into a 3D representation
 #[derive(Debug, Serialize, Clone)]
 struct UvMap {
     xy_start: (Vector2<f32>, Vector3<f32>),
@@ -182,15 +191,24 @@ impl UvMap {
         }
     }
 
+    // get the xyz position from the xy position. This will be used to fill out each face
+    // First we will get the face we want to fill
+    // then for each cell in the face, we will use this function to get the peice that contains that face
     fn get_xyz_vector_from_xy_vector(&self, xy_coordinate: Vector2<f32>) -> Vector3<f32> {
-        //
+        // Calculate the change in the 3D vector for the x direction
         let x_change: Vector3<f32> = (xy_coordinate[0] - self.xy_start.0[0]) * self.x_slope;
+        // Calculate the change in the 3D vector for the y direction
         let y_change: Vector3<f32> = (xy_coordinate[1] - self.xy_start.0[1]) * self.y_slope;
 
+        // Return the resulting 3D vector by adding the changes to the starting vector
         self.xy_start.1 + x_change + y_change
     }
 }
 
+// Our Main Cube Struct
+// this struct builds a brand new cube with 2 main access patters
+// 1.) Get - retrieve data in a way that makes it possible to represent it
+// 2.) Update - Apply standard cube moves that update the underlying data
 #[derive(Debug, Serialize, Clone)]
 pub struct Cube {
     up_map: UvMap,
@@ -215,6 +233,7 @@ impl Cube {
             }
         }
 
+        // Build a uv_map for each face
         let up_map = UvMap::new(
             (Vector2::new(0.0, 0.0), Vector3::new(-1.0, 1.0, -1.0)),
             (Vector2::new(2.0, 0.0), Vector3::new(1.0, 1.0, -1.0)),
@@ -268,6 +287,7 @@ impl Cube {
         }
     }
 
+    // apply a CubeMove
     pub fn apply_move(&mut self, cube_move: &CubeMove) {
         if let Some((face_direction, rotation_theta)) = cube_move.to_direction_and_degree() {
             for piece in self.pieces.iter_mut() {
@@ -278,7 +298,12 @@ impl Cube {
         }
     }
 
-    pub fn apply_move_with_animation(&mut self, cube_move: &CubeMove, segments: usize) -> Vec<Vec<CubePiece>> {
+    // apply a CubeMove and get incremental animation positions
+    pub fn apply_move_with_animation(
+        &mut self,
+        cube_move: &CubeMove,
+        segments: usize,
+    ) -> Vec<Vec<CubePiece>> {
         let mut cube_pieces_animation = vec![];
 
         if let Some((face_direction, rotation_theta)) = cube_move.to_direction_and_degree() {
@@ -295,14 +320,10 @@ impl Cube {
 
             for index in 1..segments {
                 let partial_theta = (rotation_theta) / segments as f32;
-
-                println!("TOTAL ROTAION {:?}", index as f32 * partial_theta);
                 // Apply rotation to the pieces
                 for &piece_index in &pieces_to_rotate_indices {
                     if let Some(piece) = self.pieces.get_mut(piece_index) {
-                        println!("pre rotate {:?} {:?} {:?}", index, piece_index, partial_theta);
                         piece.rotate(&face_direction, partial_theta);
-                        println!("post rotate {:?} {:?}", piece.position, piece.rotation);
                     }
                 }
 
@@ -324,6 +345,7 @@ impl Cube {
         None
     }
 
+    // unwrap the 3d cube to get a list of 3x3 dfaces
     pub fn unwrap(&self) -> Vec<Vec<Vec<StickerColor>>> {
         vec![
             self.unwrap_face(&Direction::Up),
@@ -346,6 +368,7 @@ impl Cube {
         }
     }
 
+    // get the UV map and use it to unwrap the desired face
     fn unwrap_face(&self, face_direction: &Direction) -> Vec<Vec<StickerColor>> {
         let mut unwraped_face: Vec<Vec<StickerColor>> = Vec::new();
         let uv_map = self.get_uv_map(face_direction);
@@ -356,7 +379,6 @@ impl Cube {
                 let new_v =
                     uv_map.get_xyz_vector_from_xy_vector(Vector2::new(col as f32, row as f32));
                 if let Some(piece) = self.get_face_piece_by_position(new_v) {
-                    println!("Cjheck sticker for piece at face_direction {:?}, {:?}, {:?}", piece.position, piece.rotation, face_direction);
                     if let Some(face) = piece.get_face(face_direction) {
                         unwrapped_row.push(face.color.clone());
                     } else {
@@ -389,69 +411,21 @@ impl Cube {
     }
 }
 
-#[derive(Debug, Serialize, Clone)]
-struct Face {
-    initial_side_direction: Direction,
-    side: Direction,
-    position: Vector3<f32>,
-    rotation: Rotation3<f32>,
-    color: StickerColor,
-}
-
-impl Face {
-    fn new(initial_side_direction: Direction) -> Self {
-        let color = direction_to_color(&initial_side_direction);
-        Face {
-            initial_side_direction: initial_side_direction.clone(),
-            side: initial_side_direction.clone(),
-            color,
-            position: initial_side_direction.clone().vector().into_inner(),
-            rotation: Rotation3::<f32>::identity().into(),
-        }
-    }
-
-    fn rotate(&mut self, rotation_axis: &Direction, rotation_theta: f32) {
-        let rotation_axis_vector = rotation_axis.vector();
-        let rotation =
-            Rotation3::from_axis_angle(&rotation_axis_vector, rotation_theta.to_radians());
-
-        let new_rotated_face_vector = rotation * self.position;
-        let new_rounded_rotated_face_vector = round_to_nearest_hundredth(&new_rotated_face_vector);
-
-        self.position = new_rounded_rotated_face_vector;
-        self.rotation = rotation * self.rotation;
-
-
-        println!(
-            "rotation_axis {:?}, original face {:?} new face vector {:?}",
-            rotation_axis, self.side, new_rounded_rotated_face_vector
-        );
-
-        if let Some(rotated_face_direcction) =
-            Direction::from_vector(new_rounded_rotated_face_vector)
-        {
-            println!(
-                "rotation_axis {:?}, original face {:?}, new face {:?}, new face vector {:?}",
-                rotation_axis, self.side, rotated_face_direcction, new_rounded_rotated_face_vector
-            );
-            self.side = rotated_face_direcction;
-        } else {
-            println!("no face");
-        }
-    }
-}
-
+// Cube piece is the individual pieces that make up the rubiks cube
+// 26 in total: 8 corner pieces with 3 faces, 12 edge pieces with 2 faces, and 6 center pieces with 1 face
 #[derive(Debug, Serialize, Clone)]
 pub struct CubePiece {
-    faces: Vec<Face>,
-    position: Vector3<f32>,
-    rotation: Rotation3<f32>,
+    faces: Vec<Face>, // holds the faces of the CubePiece 
+    position: Vector3<f32>, // holds the position, this will change as the cube is being rotated
+    rotation: Rotation3<f32>, // holds the current rotation of the cube piece this will change as the cube is rotated
 }
 
 impl CubePiece {
     fn new(position: Vector3<f32>) -> Self {
         let mut faces: Vec<Face> = Vec::new();
 
+        // Based on the initial location of the cube piece we can check what faces this cube should have
+        // for example, the Left, Top, Front, piece will have 3 faces. One on the Left, one on the Top, and one on the Front
         for direction in Direction::iter() {
             match vector_is_composed_with_direction(position, &direction) {
                 true => {
@@ -469,10 +443,12 @@ impl CubePiece {
         }
     }
 
-    fn get_face(&self, target: &Direction) -> Option<&Face> {
+    // Get the face based on the piece and target face
+    // this is based on the global cube face direction.
+    // For example, if we want to build the left face we will first get all peices on the left, then get the face pointing to the left
+    fn get_face(&self, target_cube_face: &Direction) -> Option<&Face> {
         for (index, face) in self.faces.iter().enumerate() {
-            println!("get_face {:?}, {:?}, {:?}", face.side,face.position, target);
-            if face.side == *target {
+            if face.side == *target_cube_face {
                 return Some(&face);
             }
         }
@@ -483,6 +459,7 @@ impl CubePiece {
         self.position
     }
 
+    // apply rotation
     fn rotate(&mut self, rotation_axis: &Direction, rotation_theta: f32) {
         let rotation_axis_vector = rotation_axis.vector();
         let rotation =
@@ -494,6 +471,48 @@ impl CubePiece {
 
         for face in self.faces.iter_mut() {
             face.rotate(rotation_axis, rotation_theta);
+        }
+    }
+}
+
+// Face is the entity that will contain the sticker color. THis
+#[derive(Debug, Serialize, Clone)]
+struct Face {
+    initial_side_direction: Direction, // where was this side initially placed
+    side: Direction, // as the cube is being rotated the side of the cube this face is on will change
+    position: Vector3<f32>, // as the cube is being rotated the position of the face will change
+    rotation: Rotation3<f32>, // as the cube is being rotated the rotation of the face will change
+    color: StickerColor,
+}
+
+impl Face {
+    fn new(initial_side_direction: Direction) -> Self {
+        let color = direction_to_color(&initial_side_direction);
+        Face {
+            initial_side_direction: initial_side_direction.clone(), // keep track of initial
+            side: initial_side_direction.clone(),
+            color,
+            position: initial_side_direction.clone().vector().into_inner(),
+            rotation: Rotation3::<f32>::identity().into(),
+        }
+    }
+
+    fn rotate(&mut self, rotation_axis: &Direction, rotation_theta: f32) {
+        let rotation_axis_vector = rotation_axis.vector();
+        let rotation =
+            Rotation3::from_axis_angle(&rotation_axis_vector, rotation_theta.to_radians());
+
+        let new_rotated_face_vector = rotation * self.position;
+        let new_rounded_rotated_face_vector = round_to_nearest_hundredth(&new_rotated_face_vector);
+
+        self.position = new_rounded_rotated_face_vector;
+        self.rotation = rotation * self.rotation;
+        if let Some(rotated_face_direcction) =
+            Direction::from_vector(new_rounded_rotated_face_vector)
+        {
+            self.side = rotated_face_direcction;
+        } else {
+            println!("no face");
         }
     }
 }
