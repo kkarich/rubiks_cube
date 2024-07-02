@@ -432,7 +432,7 @@ impl CubePiece {
                     let face = Face::new(direction);
                     faces.push(face);
                 }
-                false => println!("No face at direction: {:?}", direction),
+                false => (),
             }
         }
 
@@ -511,8 +511,6 @@ impl Face {
             Direction::from_vector(new_rounded_rotated_face_vector)
         {
             self.side = rotated_face_direcction;
-        } else {
-            println!("no face");
         }
     }
 }

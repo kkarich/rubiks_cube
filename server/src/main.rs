@@ -39,6 +39,7 @@ struct CubeState {
 fn get_cube(app_state_pointer: &State<AppStatePointer>) -> Json<CubeState> {
     let app_state = app_state_pointer.lock().unwrap();
     let cube = &app_state.cube;
+    cube.print();
     Json(CubeState {
         pieces: cube.pieces.clone(),
         animation: vec![],
@@ -53,6 +54,7 @@ fn apply_move(app_state: &State<AppStatePointer>, cube_move: CubeMove) -> Json<C
 
     let animation = cube.clone().apply_move_with_animation(&cube_move, 10);
     cube.apply_move(&cube_move);
+    cube.print();
     Json(CubeState {
         pieces: cube.pieces.clone(),
         animation,
